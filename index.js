@@ -62,7 +62,7 @@ board.on('ready', function () {
     // })
 
     this.repl.inject({
-        gripper, joint1, joint2, motors, turn
+        gripper, joint1, joint2, motors, turn, enable
     })
 
 })
