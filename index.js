@@ -48,18 +48,18 @@ board.on('ready', function () {
     // gripper.center()
     // joint1.center()
     // joint2.center()
-    motors.on('forward', function(){
-        enable.high()
-        console.log("Drive motors enabled")
-    })
-    motors.on('reverse', function() {
-        enable.high()
-        console.log("Drive motors enabled")
-    })
-    motors.on('stop', function() {
-        enable.low()
-        console.log("Drive motors disabled")
-    })
+    // motors.on('forward', function(){
+    //     enable.high()
+    //     console.log("Drive motors enabled")
+    // })
+    // motors.on('reverse', function() {
+    //     enable.high()
+    //     console.log("Drive motors enabled")
+    // })
+    // motors.on('stop', function() {
+    //     enable.low()
+    //     console.log("Drive motors disabled")
+    // })
 
     this.repl.inject({
         gripper, joint1, joint2, motors, turn
