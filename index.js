@@ -38,8 +38,8 @@ board.on('ready', function () {
         range: [30, 180]
     })
     const motors = new five.Motors([
-        { pins: { dir: "P1-31", pwm: "P1-33" }, invertPWM },
-        { pins: { dir: "P1-35", pwm: "P1-37" }, invertPWM }
+        { pins: { dir: "P1-31", pwm: "P1-33" }, invertPWM:true },
+        { pins: { dir: "P1-35", pwm: "P1-37" }, invertPWM:true }
     ])
     const enable = new five.Pin({
         pin: "P1-7",
