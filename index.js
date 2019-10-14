@@ -7,18 +7,13 @@ const board = new five.Board({
     io: new Raspi()
 })
 
-function msg() {
-    console.log("function from outside the board")
-}
-
 board.on('ready', function () {
 
     console.log('Board is ready')
 
     this.repl.inject({
-        gripper, joint1, joint2, motors, turn, enable, msg
+        piArm, piMotors
     })
-
 })
 
 board.on('fail', function (event) {
