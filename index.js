@@ -3,20 +3,28 @@ const five = require('johnny-five')
 const rpi = require('pi-io')
 
 const board = new five.Board({
-    io: new PiIO()
+    io: new rpi()
 })
+
+let distance = 0
 
 board.on('ready', function () {
     console.log('Board is ready')
-    // const piMotors = require('./motors')
-    // const piArm = require('./arm')
-    const piDistance = require('./hcsr04')
+    const piMotors = require('./motors')
+    const piArm = require('./arm')
+    const proximity = new five.Proximity({
+        controller: rpi.HCSR04, // Custom controller
+        triggerPin: 'P1-11',
+        echoPin: 'P1-16'
+    })
 
-    piDistance.on('change', (data) => console.log(data))
+    proximity.on('change', (data) => distance = data)
 
-    // this.repl.inject({
-    //     piArm, piMotors
-    // })
+    setInterval( function() { console.log(distance)}, 1500)
+
+    this.repl.inject({
+        piArm, piMotors
+    })
 })
 
 board.on('fail', function (event) {
