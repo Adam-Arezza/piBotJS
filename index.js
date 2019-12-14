@@ -1,7 +1,9 @@
 const five = require('johnny-five')
 // const Raspi = require('raspi-io').RaspiIO
+const cors = require('cors')
 const express = require('express')
 const app = express()
+app.use(cors())
 const http = require('http').createServer(app)
 const io = require('socket.io')(http)
 
@@ -30,11 +32,16 @@ board.on('ready', function () {
         socket.on("move", (dir) => {
             switch(dir) {
                 case "forward":
+                    piMotors.enable.high()
                     piMotors.motors.forward(255)
                     break
                 case "reverse":
+                    piMotors.enable.high()
                     piMotors.motors.reverse(255)
                     break
+                case "stop":
+                    piMotors.enable.low()
+                    piMotors.motors.stop()
                 default:
                     console.log("not moving")
             }
