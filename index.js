@@ -6,12 +6,11 @@ const app = express()
 app.use(cors())
 const http = require('http').createServer(app)
 const io = require('socket.io')(http)
-
 const rpi = require('pi-io')
-
 const board = new five.Board({
     io: new rpi()
 })
+
 
 let distance = 0
 

@@ -1,5 +1,6 @@
 const five = require('johnny-five')
 
+//uses the pin numbers on the rpi header, not the GPIO numbers
 const motors = new five.Motors([
     { pins: { dir: "P1-31", pwm: "P1-33" }, invertPWM:true },
     { pins: { dir: "P1-35", pwm: "P1-37" }, invertPWM:true }
