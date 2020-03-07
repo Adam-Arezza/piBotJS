@@ -7,24 +7,27 @@ app.use(cors())
 const http = require('http').createServer(app)
 const io = require('socket.io')(http)
 const rpi = require('pi-io')
+const cv = require('opencv4nodejs')
 const board = new five.Board({
     io: new rpi()
 })
 
 
-let distance = 0
+// let distance = 0
+const cam = cv.VideoCapture(0)
+const fps = 10
 
 board.on('ready', function () {
     console.log('Board is ready')
     const piMotors = require('./motors')
     const piArm = require('./arm')
-    const proximity = new five.Proximity({
-        controller: rpi.HCSR04, // Custom controller
-        triggerPin: 'P1-11',
-        echoPin: 'P1-16'
-    })
-
-    proximity.on('change', (data) => distance = data)
+    const prox = require('./distance')
+    // const proximity = new five.Proximity({
+    //     controller: rpi.HCSR04, // Custom controller
+    //     triggerPin: 'P1-11',
+    //     echoPin: 'P1-16'
+    // })
+    // proximity.on('change', (data) => distance = data)
 
     io.on('connection', (socket) => {
         console.log("connection successful")
@@ -45,15 +48,13 @@ board.on('ready', function () {
                     console.log("not moving")
             }
         })
-        setInterval( function() {
-            io.emit('distance', distance)
-        }, 1000)
     })
-    // setInterval( function() { console.log(distance)}, 1500)
 
-    // this.repl.inject({
-    //     piArm, piMotors
-    // })
+    setInterval(() => {
+        const frame = cam.read()
+        const img = cv.imencode('.jpg',frame).toString('base64')
+        io.emit('videoData', img)
+    }, 1000/fps)
 })
 
 board.on('fail', function (event) {
