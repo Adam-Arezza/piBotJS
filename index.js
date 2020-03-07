@@ -15,14 +15,15 @@ const board = new five.Board({
 const cam = new cv.VideoCapture(0)
 const fps = 10
 
+setInterval(() => {
+    const frame = cam.read()
+    const img = cv.imencode('.jpg',frame).toString('base64')
+    io.emit('videoData', img)
+}, 1000/fps)
+
 board.on('ready', function () {
     console.log('Board is ready')
 
-    setInterval(() => {
-        const frame = cam.read()
-        const img = cv.imencode('.jpg',frame).toString('base64')
-        io.emit('videoData', img)
-    }, 1000/fps)
     // const piMotors = require('./motors')
     // const piArm = require('./arm')
     // const prox = require('./distance')
