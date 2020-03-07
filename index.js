@@ -1,5 +1,4 @@
 const five = require('johnny-five')
-// const Raspi = require('raspi-io').RaspiIO
 const cors = require('cors')
 const express = require('express')
 const app = express()
@@ -10,24 +9,16 @@ const rpi = require('pi-io')
 const cv = require('opencv4nodejs')
 const board = new five.Board({
     io: new rpi()
-})
+}, {repl: false})
 
-
-// let distance = 0
 const cam = new cv.VideoCapture(0)
 const fps = 10
 
 board.on('ready', function () {
     console.log('Board is ready')
-    const piMotors = require('./motors')
-    const piArm = require('./arm')
-    const prox = require('./distance')
-    // const proximity = new five.Proximity({
-    //     controller: rpi.HCSR04, // Custom controller
-    //     triggerPin: 'P1-11',
-    //     echoPin: 'P1-16'
-    // })
-    // proximity.on('change', (data) => distance = data)
+    // const piMotors = require('./motors')
+    // const piArm = require('./arm')
+    // const prox = require('./distance')
 
     io.on('connection', (socket) => {
         console.log("connection successful")
