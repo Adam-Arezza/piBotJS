@@ -8,14 +8,21 @@ const io = require('socket.io')(http)
 const rpi = require('pi-io')
 const cv = require('opencv4nodejs')
 const board = new five.Board({
-    io: new rpi()
-}, {repl: false})
+    io: new rpi(),
+    repl:false
+})
 
 const cam = new cv.VideoCapture(0)
 const fps = 10
 
 board.on('ready', function () {
     console.log('Board is ready')
+
+    setInterval(() => {
+        const frame = cam.read()
+        const img = cv.imencode('.jpg',frame).toString('base64')
+        io.emit('videoData', img)
+    }, 1000/fps)
     // const piMotors = require('./motors')
     // const piArm = require('./arm')
     // const prox = require('./distance')
@@ -41,11 +48,6 @@ board.on('ready', function () {
         // })
     })
 
-    setInterval(() => {
-        const frame = cam.read()
-        const img = cv.imencode('.jpg',frame).toString('base64')
-        io.emit('videoData', img)
-    }, 1000/fps)
 })
 
 board.on('fail', function (event) {
