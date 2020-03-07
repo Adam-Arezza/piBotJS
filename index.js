@@ -22,23 +22,23 @@ board.on('ready', function () {
 
     io.on('connection', (socket) => {
         console.log("connection successful")
-        socket.on("move", (dir) => {
-            switch(dir) {
-                case "forward":
-                    piMotors.enable.high()
-                    piMotors.motors.forward(255)
-                    break
-                case "reverse":
-                    piMotors.enable.high()
-                    piMotors.motors.reverse(255)
-                    break
-                case "stop":
-                    piMotors.enable.low()
-                    piMotors.motors.stop()
-                default:
-                    console.log("not moving")
-            }
-        })
+        // socket.on("move", (dir) => {
+        //     switch(dir) {
+        //         case "forward":
+        //             piMotors.enable.high()
+        //             piMotors.motors.forward(255)
+        //             break
+        //         case "reverse":
+        //             piMotors.enable.high()
+        //             piMotors.motors.reverse(255)
+        //             break
+        //         case "stop":
+        //             piMotors.enable.low()
+        //             piMotors.motors.stop()
+        //         default:
+        //             console.log("not moving")
+        //     }
+        // })
     })
 
     setInterval(() => {
