@@ -21,38 +21,38 @@ setInterval(() => {
     io.emit('videoData', img)
 }, 1000/fps)
 
-board.on('ready', function () {
-    console.log('Board is ready')
+// board.on('ready', function () {
+//     console.log('Board is ready')
 
-    // const piMotors = require('./motors')
-    // const piArm = require('./arm')
-    // const prox = require('./distance')
+//     // const piMotors = require('./motors')
+//     // const piArm = require('./arm')
+//     // const prox = require('./distance')
 
-    io.on('connection', (socket) => {
-        console.log("connection successful")
-        // socket.on("move", (dir) => {
-        //     switch(dir) {
-        //         case "forward":
-        //             piMotors.enable.high()
-        //             piMotors.motors.forward(255)
-        //             break
-        //         case "reverse":
-        //             piMotors.enable.high()
-        //             piMotors.motors.reverse(255)
-        //             break
-        //         case "stop":
-        //             piMotors.enable.low()
-        //             piMotors.motors.stop()
-        //         default:
-        //             console.log("not moving")
-        //     }
-        // })
-    })
+//     io.on('connection', (socket) => {
+//         console.log("connection successful")
+//         // socket.on("move", (dir) => {
+//         //     switch(dir) {
+//         //         case "forward":
+//         //             piMotors.enable.high()
+//         //             piMotors.motors.forward(255)
+//         //             break
+//         //         case "reverse":
+//         //             piMotors.enable.high()
+//         //             piMotors.motors.reverse(255)
+//         //             break
+//         //         case "stop":
+//         //             piMotors.enable.low()
+//         //             piMotors.motors.stop()
+//         //         default:
+//         //             console.log("not moving")
+//         //     }
+//         // })
+//     })
 
-})
+// })
 
-board.on('fail', function (event) {
-    console.log(event)
-})
+// board.on('fail', function (event) {
+//     console.log(event)
+// })
 
 http.listen(3000, ()=> console.log('listening on port 3000'))
