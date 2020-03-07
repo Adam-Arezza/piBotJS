@@ -14,7 +14,7 @@ const board = new five.Board({
 
 
 // let distance = 0
-const cam = cv.VideoCapture(0)
+const cam = new cv.VideoCapture(0)
 const fps = 10
 
 board.on('ready', function () {
