@@ -1,19 +1,19 @@
-const five = require('johnny-five')
+// const five = require('johnny-five')
 const cors = require('cors')
 const express = require('express')
 const app = express()
 app.use(cors())
 const http = require('http').createServer(app)
 const io = require('socket.io')(http)
-const rpi = require('pi-io')
+// const rpi = require('pi-io')
 const cv = require('opencv4nodejs')
-const board = new five.Board({
-    io: new rpi(),
-    repl:false
-})
+// const board = new five.Board({
+//     io: new rpi(),
+//     repl:false
+// })
 
 const cam = new cv.VideoCapture(0)
-const fps = 10
+const fps = 5
 
 setInterval(() => {
     const frame = cam.read()
