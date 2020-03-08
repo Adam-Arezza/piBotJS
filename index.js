@@ -40,6 +40,14 @@ board.on('ready', function () {
                     piMotors.enable.high()
                     piMotors.motors.reverse(255)
                     break
+                case "left":
+                    piMotors.enable.high()
+                    piMotors.turn(piMotors.motors, "left", 255)
+                    break
+                case "right":
+                    piMotors.enable.high()
+                    piMotors.turn(piMotors.motors, "right", 255)
+                    break
                 case "stop":
                     piMotors.enable.low()
                     piMotors.motors.stop()
