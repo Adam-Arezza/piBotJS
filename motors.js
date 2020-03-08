@@ -11,11 +11,11 @@ const enable = new five.Pin({
 })
 
 function turn(motors, direction, speed){
-    if(direction == "left") {
+    if(direction == "right") {
         motors[0].forward(speed)
         motors[1].reverse(speed)
     }
-    if(direction == "right") {
+    if(direction == "left") {
         motors[0].reverse(speed)
         motors[1].forward(speed)
     }
