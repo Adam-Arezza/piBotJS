@@ -13,6 +13,8 @@ const board = new five.Board({
 })
 
 const cam = new cv.VideoCapture(0)
+cam.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+cam.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
 const fps = 5
 
 setInterval(() => {
