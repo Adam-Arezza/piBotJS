@@ -12,29 +12,38 @@ const board = new five.Board({
     io: new rpi()
 })
 
-// const cam = new cv.VideoCapture(0)
-// cam.set(cv.CAP_PROP_FRAME_WIDTH, 640)
-// cam.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
-// const fps = 5
+//initialize video
+const cam = new cv.VideoCapture(0)
+cam.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+cam.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
+const fps = 5
 
-// setInterval(() => {
-//     const frame = cam.read()
-//     const img = cv.imencode('.jpg',frame).toString('base64')
-//     io.emit('videoData', img)
-// }, 1000/fps)
+//emits a video frame at fps times per second to the client
+setInterval(() => {
+    const frame = cam.read()
+    const img = cv.imencode('.jpg',frame).toString('base64')
+    io.emit('videoData', img)
+}, 1000/fps)
 
-const piArm = require('./arm')
+//initalize the arm servos
+const piArm = require("./arm")
+
+//set the arduino i2c address
 const arduino = 0x08
+
+//initialize an mpu9250 object
 const imu = new mpu({ UpMagneto: true, scaleValues: true })
 imu.initialize()
 
+//initialize a new LCD component
 const LCD = new five.LCD({
     rows: 4,
     cols: 20,
     controller: "PCF8574T"
 })
 
-let welcome = () => {
+//displays a welcome message on the LCD
+const welcome = () => {
     LCD.useChar("ascchart7")
     LCD.useChar("descchart5")
     LCD.cursor(0, 0).print("Hello, Greg")
@@ -48,10 +57,10 @@ let welcome = () => {
         LCD.cursor(2, 6).print(":descchart5:")
         LCD.cursor(1, 7).print(":descchart5:")
     }, 2000)
-
 }
 
-let distance = (distData) => {
+//gets distance sensor data from the arduino
+const distanceRead = (distData) => {
     board.io.i2cConfig({
         address: arduino
     })
@@ -61,23 +70,28 @@ let distance = (distData) => {
     })
 }
 
-let motorCommand = (direction, speed) => {
+//sends motor commands to the arduino
+const motorCommand = (direction, speed) => {
+    //forward direction == 1
+    //reverse direction == 2
+    //speed 0 to 255
+    let cmd = 2
+    //need a function to determine left and right wheel speed and direction
     board.i2cConfig({
         address: arduino
     })
-    board.io.i2cWrite(arduino, [direction, speed])
+    board.io.i2cWrite(arduino, [cmd, direction, speed, direction, speed])
 }
-
-
 
 board.on('ready', function () {
     console.log('Board is ready')
-
     this.repl.inject({
-        distance,
+        distanceRead,
         LCD,
         imu,
-        welcome
+        welcome,
+        motorCommand,
+        piArm
     })
 
     io.on('connection', (socket) => {
@@ -85,12 +99,10 @@ board.on('ready', function () {
         socket.on("move", (dir) => {
             switch (dir) {
                 case "forward":
-                    piMotors.enable.high()
-                    piMotors.motors.forward(255)
+                    motorCommand(1, 255)
                     break
                 case "reverse":
-                    piMotors.enable.high()
-                    piMotors.motors.reverse(255)
+                    motorCommand(2, 255)
                     break
                 case "left":
                     piMotors.enable.high()
@@ -101,8 +113,7 @@ board.on('ready', function () {
                     piMotors.turn(piMotors.motors, "right", 255)
                     break
                 case "stop":
-                    piMotors.enable.low()
-                    piMotors.motors.stop()
+                    motorCommand(1, 0)
                 default:
                     console.log("not moving")
             }
