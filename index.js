@@ -15,7 +15,6 @@ const board = new five.Board({
     repl: false
 })
 
-
 // //initialize video
 // const cam = new cv.VideoCapture(0)
 // cam.set(cv.CAP_PROP_FRAME_WIDTH, 640)
@@ -29,15 +28,21 @@ const board = new five.Board({
 //     io.emit('videoData', img)
 // }, 1000 / fps)
 
-const KP = 20
-const KI = 0.8
+const KP = 40
+const KI = 0.1
 const KD = 0
 let xGoal = 0
 let yGoal = 0
 let headingAngle
-const l = 0.025
 let count = 0
 let reFresh
+let dt = 0.05
+const gryoOffsets = {
+    x:1.342473282, 
+    y: -1.471261069,
+    z: 1.35940458
+}
+
 
 const robotData = {
     deltaTL: 0,
@@ -64,65 +69,63 @@ const robotData = {
 const arduino = 0x08
 
 //initialize an mpu9250 object
-// const imu = new mpu({ UpMagneto: true, scaleValues: true })
-// imu.initialize()
+const imu = new mpu({ UpMagneto: true, scaleValues: true, gyroBiasOffset: gryoOffsets})
+imu.initialize()
 
 //initialize a new LCD component
-// const LCD = new five.LCD({
-//     rows: 4,
-//     cols: 20,
-//     controller: "PCF8574T"
-// })
-
-//displays a welcome message on the LCD
-// function welcome() {
-//     LCD.useChar("ascchart7")
-//     LCD.useChar("descchart5")
-//     LCD.cursor(0, 0).print("Hello, Greg")
-//     setTimeout(() => {
-//         LCD.clear()
-//         LCD.cursor(0, 4).print(":ascchart7:")
-//         LCD.cursor(0, 6).print(":ascchart7:")
-//         LCD.cursor(1, 3).print(":descchart5:")
-//         LCD.cursor(2, 4).print(":descchart5:")
-//         LCD.cursor(2, 5).print(":descchart5:")
-//         LCD.cursor(2, 6).print(":descchart5:")
-//         LCD.cursor(1, 7).print(":descchart5:")
-//     }, 2000)
-// }
+const LCD = new five.LCD({
+    rows: 4,
+    cols: 20,
+    controller: "PCF8574T"
+})
 
 //get goal coordinates from the user
 function getGoal() {
     return new Promise((resolve, reject) => {
         inquirer.prompt([
             {
-                type: 'number',
-                name: 'x',
-                message: "x?"
+                type: 'input',
+                name: 'x1',
+                message: "x1?"
             },
             {
-                type: 'number',
-                name: 'y',
-                message: "y?"
+                type: 'input',
+                name: 'y1',
+                message: "y1?"
             }
         ])
             .then((answers) => {
-                xGoal = answers.x
-                yGoal = answers.y
+                xGoal = Number(answers.x1)
+                yGoal = Number(answers.y1)
+                if(isNaN(xGoal) || isNaN(yGoal)) {
+                    throw new Error("coordinates must be numeric values")
+                }
                 headingAngle = Math.atan2(yGoal, xGoal)
                 resolve("success")
             })
             .catch((err) => {
                 console.log(err)
                 reject("No coordinates")
+                updater()
             })
     })
 }
 
+function getNewHeadingGoal(v1, v2) {
+    let dotProd = v1[0] * v2[0] + v1[1] * v2[1]
+    console.log(dotProd)
+    let v1Mag = Math.sqrt(Math.pow(v1[0], 2) + Math.pow(v1[1], 2))
+    console.log(v1Mag)
+    let v2Mag = Math.sqrt(Math.pow(v2[0], 2) + Math.pow(v2[1], 2))
+    console.log(v2Mag)
+    return Math.acos((dotProd) / (v1Mag * v2Mag))
+}
+
 //gets distance sensor + encoder data from the arduino
 function getAllData() {
+    robotData.imu = imu.getGyro()
+    // updateLCD()
     try {
-        // console.log("Gathering data...")
         board.io.i2cConfig({
             address: arduino
         })
@@ -136,52 +139,100 @@ function getAllData() {
             let rightTick = Number(rightEncoder.readInt32BE(0).toString())
             robotData.deltaTL = Number((leftTick - robotData.leftTickTotal).toFixed(3))
             robotData.deltaTR = Number((rightTick - robotData.rightTickTotal).toFixed(3))
-            robotData.leftTickTotal = leftTick
-            robotData.rightTickTotal = rightTick
+            let tpsR = robotData.rightRPM / (60 * 40)
+            let tpsL = robotData.leftRPM / (60 * 40)
+            let ticksR = Math.round(tpsR * dt)
+            let ticksL = Math.round(tpsL * dt)
+            if (robotData.deltaTL > ticksL + 15) {
+                robotData.leftTickTotal = robotData.leftTickTotal + ticksL
+                robotData.deltaTL = ticksL
+            }
+            else if (leftTick < 0) {
+                robotData.leftTickTotal = robotData.leftTickTotal + ticksL
+                robotData.deltaTL = ticksL
+            }
+            else {
+                robotData.leftTickTotal = leftTick
+            }
+            if (robotData.deltaTR > tpsR + 15) {
+                robotData.rightTickTotal = robotData.rightTickTotal + ticksR
+                robotData.deltaTR = ticksR
+            }
+            else if (rightTick < 0) {
+                robotData.rightTickTotal = robotData.rightTickTotal + ticksR
+                robotData.deltaTR = ticksR
+            }
+            else {
+                robotData.rightTickTotal = rightTick
+            }
+            // robotData.leftTickTotal = leftTick
+            // robotData.rightTickTotal = rightTick
+            // console.log(leftTick, rightTick)
         })
-        // robotData.imu = imu1.getMotion9()
         getNewPos()
     }
     catch (err) {
-        console.log(err)
+        console.log("---------------------------------------------------------------------")
+        let tpsR = robotData.rightRPM / (60 * 40)
+        let tpsL = robotData.leftRPM / (60 * 40)
+        let ticksR = Math.round(tpsR * dt)
+        let ticksL = Math.round(tpsL * dt)
+        robotData.leftTickTotal = robotData.leftTickTotal + ticksL
+        robotData.rightTickTotal = robotData.rightTickTotal + ticksR
+        robotData.deltaTL = ticksL
+        robotData.deltaTR = ticksR
+        motorCommand(0,0)
+        handleCommsErr()
     }
-
+}
+function updateLCD() {
+    try {
+        LCD.cursor(0, 0).print(`x position: `)
+        LCD.cursor(0, 13).print(robotData.posX.toString())
+        LCD.cursor(1, 0).print(`y position: `)
+        LCD.cursor(1, 13).print(robotData.posY.toString())
+        LCD.cursor(2, 0).print(`heading: `)
+        LCD.cursor(2, 9).print(robotData.heading.toString())
+    }
+    catch (err) {
+        console.log("-------------LCD ERROR-------------------")
+    }
 }
 
 function getNewPos() {
-    // console.log("calculating new position")
     let dr = 2 * Math.PI * robotData.wheelRadius * (robotData.deltaTR / 40)
     let dl = 2 * Math.PI * robotData.wheelRadius * (robotData.deltaTL / 40)
+    dr = Number(dr.toFixed(4))
+    dl = Number(dl.toFixed(4))
     let dc = (dl + dr) / 2
-    let rightRadPerSec = (dr / 0.1) / robotData.wheelRadius
-    let leftRadPerSec = (dl / 0.1) / robotData.wheelRadius
+    let rightRadPerSec = (dr / dt) / robotData.wheelRadius
+    let leftRadPerSec = (dl / dt) / robotData.wheelRadius
     robotData.rightRPM = (rightRadPerSec / (2 * Math.PI)) * 60
     robotData.leftRPM = (leftRadPerSec / (2 * Math.PI)) * 60
     //Calculate robot heading
-    robotData.heading = Number((robotData.heading + ((dr - dl) / robotData.wheelBase)).toFixed(3))
+    let headingEncoders = Number((robotData.heading + ((dr - dl) / robotData.wheelBase)).toFixed(3))
+    let headingImu = Number((robotData.heading + robotData.imu[2] * 0.0174533 * dt).toFixed(4))
+    if(headingEncoders > headingImu) {
+        robotData.heading = (0.3 * headingEncoders + 0.7 * headingImu)
+    }
+    else{
+        robotData.heading = (0.5 * headingEncoders + 0.5 * headingImu)
+    }
     robotData.posX = Number((robotData.posX + dc * Math.cos(robotData.heading)).toFixed(3))
     robotData.posY = Number((robotData.posY + dc * Math.sin(robotData.heading)).toFixed(3))
-
     //add a correction factor for heading using IMU
+    console.log(headingImu, headingEncoders, robotData.heading)
+    // console.log(robotData.imu)
     goToGoal()
 }
 
 function goToGoal() {
-    // console.log("heading to goal")
     let u1 = Math.abs(xGoal - robotData.posX)
     let u2 = Math.abs(yGoal - robotData.posY)
-    // let u1 = (xGoal - robotData.posX)
-    // let u2 = (yGoal - robotData.posY)
-    // if(Number(u1.toFixed(3)) < 0.03 ) {
-    //     u1 = 0
-    // }
-    // if(Number(u2.toFixed(3)) < 0.03) {
-    //     u2 = 0
-    // }
-    if(Math.abs(robotData.posX) > Math.abs(xGoal)) {
+    if (Math.abs(robotData.posX) > Math.abs(xGoal)) {
         u1 = 0
     }
-    if(Math.abs(robotData.posY) > Math.abs(yGoal)) {
+    if (Math.abs(robotData.posY) > Math.abs(yGoal)) {
         u2 = 0
     }
     u1 = Number(u1.toFixed(3))
@@ -196,17 +247,17 @@ function controller(e) {
     robotData.headingErr = Number((headingAngle - robotData.heading).toFixed(3))
     let deltaErr = robotData.headingErr - oldErr
     robotData.sumErr = Number((robotData.sumErr + robotData.headingErr).toFixed(3))
-    let pidOut = KP * robotData.headingErr + KI * robotData.sumErr + KD * deltaErr
-    // console.log(oldErr, headingAngle, robotData.heading, robotData.headingErr, robotData.sumErr, deltaErr)
+    let pidOut = KP * robotData.headingErr + KI * robotData.sumErr * dt + KD * (deltaErr / dt)
     let hErr = Number(robotData.headingErr.toFixed(2))
     let xErr = Number(e[0].toFixed(3))
     let yErr = Number(e[1].toFixed(3))
 
-    if (hErr < 0.05 && xErr < 0.05 && yErr < 0.05 && count != 0) {
+    if (hErr < 0.03 && xErr < 0.03 && yErr < 0.03 && count != 0) {
         motorCommand(0, 0)
         clearInterval(reFresh)
         setTimeout(resetArduino, 200)
         console.log(`Moved to x: ${xGoal} y: ${yGoal}`)
+        updateLCD()
         resetRobotData()
         return updater()
     }
@@ -214,15 +265,14 @@ function controller(e) {
 }
 
 function mapVals(outPut, u) {
-    // console.log("Determining translational and angular velocities")
     let v = Math.abs(Math.sqrt((u[0] * u[0]) + (u[1] * u[1])))
     v = Number(v.toFixed(3))
-    // console.log(`Translation: ${v}  Rad/s: ${outPut}`)
     let vr = Math.round((2 * v + outPut * robotData.wheelBase) / (2 * robotData.wheelRadius))
     let vl = Math.round((2 * v - outPut * robotData.wheelBase) / (2 * robotData.wheelRadius))
+    //
+    // data log
+    // console.log(robotData.headingErr, robotData.heading, robotData.posX, robotData.posY, robotData.leftTickTotal, robotData.rightTickTotal, u, robotData.deltaTL, robotData.deltaTR, vr, vl)
     // console.log(vr, vl)
-    console.log(robotData.headingErr, robotData.heading, robotData.posX, robotData.posY, robotData.leftTickTotal, robotData.rightTickTotal, v, u, vl, vr)
-    // console.log(robotData.headingErr, u, robotData.leftTickTotal, robotData.rightTickTotal, robotData.leftRPM, robotData.rightRPM)
     motorCommand(vr, vl)
 }
 
@@ -231,7 +281,6 @@ function motorCommand(vr, vl) {
     //forward direction == 1
     //reverse direction == 2
     //speed 5 to 35 = 200 to 255
-    // console.log(vr, vl)
     const vMax = 255
     const vMin = 200
     let spdL
@@ -239,7 +288,7 @@ function motorCommand(vr, vl) {
     const dirL = 1
     const dirR = 1
     const upperThresh = 35
-    const lowerThresh = 5
+    const lowerThresh = 1
     const threshRange = upperThresh - lowerThresh
     const maxRange = vMax - vMin
     // vr = vr * 1.25
@@ -309,16 +358,24 @@ function resetRobotData() {
             robotData[key] = 0
         }
     })
-    return console.log("Robot reset")
+    xGoal = 0
+    yGoal = 0
+    return console.log("Robot reset", robotData)
+}
+
+function handleCommsErr() {
+    board.i2cConfig({
+        address: arduino
+    })
+    board.io.i2cWrite(arduino, [4, robotData.leftTickTotal, robotData.rightTickTotal])
 }
 
 const updater = async () => {
     let start = await getGoal()
     if (start) {
-        reFresh = setInterval(getAllData, 50)
+        reFresh = setInterval(getAllData, (dt * 1000))
     }
 }
-
 
 board.on('ready', function () {
     console.log('Board is ready')
@@ -356,15 +413,5 @@ board.on('ready', function () {
     })
     updater()
 })
-
-// board.on("exit", function() {
-//     motorCommand(1, 0, 1, 0)
-//     clearInterval(updater)
-// })
-
-// board.on("close", function() {
-//     motorCommand(1, 0, 1, 0)
-//     clearInterval(updater)
-// })
 
 http.listen(3000, () => console.log('listening on port 3000'))
