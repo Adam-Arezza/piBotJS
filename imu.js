@@ -16,9 +16,11 @@ let refresh = setInterval(getData, 300)
 //     z: 1.35940458
 // }
 
-const GYRO_OFFSET = { x: 1.5022595419847335,
-    y: -1.490045801526719,
-    z: 1.2073740458015256 }
+const GYRO_OFFSET = {
+    x: 1.5055801526717534,
+    y: -1.4851297709923665,
+    z: 1.1479847328244286
+}
 
 function getData() {
     let vals = mpu.getGyro()

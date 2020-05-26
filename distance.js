@@ -1,12 +1,11 @@
 const five = require('johnny-five')
 const rpi = require('pi-io')
 
-const proximity = new five.Proximity({
-    controller: rpi.HCSR04, // Custom controller
-    triggerPin: 'P1-11',
-    echoPin: 'P1-16'
-})
+const board = new five.Board({
+    io: new rpi(),
+    repl: false
+}) 
 
-module.exports = {
-    proximity
-}
+board.on("ready" , function() {
+    
+})

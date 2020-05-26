@@ -34,7 +34,10 @@ const KD = 0
 let xGoal = 0
 let yGoal = 0
 let headingAngle = 0
+let avoid = 0
 let count = 0
+let obstacles = 0
+const obstacleThresh = 30
 var reFresh
 let dt = 0.04
 let goals = []
@@ -67,7 +70,9 @@ const robotData = {
     vr: 0,
     vl: 0,
     pwmR: 0,
-    pwmL: 0
+    pwmL: 0,
+    fwStart: [],
+    objEdge: []
 }
 
 //initalize the arm servos
@@ -222,7 +227,7 @@ function getAllData() {
             let tpsL = robotData.leftRPM / (60 * 40)
             let ticksR = Math.round(tpsR * dt)
             let ticksL = Math.round(tpsL * dt)
-            console.log(leftTick, rightTick)
+            // console.log(leftTick, rightTick)
             if (!robotData.deltaTR && robotData.vr) {
                 rightEncodeErr++
             }
@@ -250,7 +255,6 @@ function getAllData() {
                 robotData.rightTickTotal = rightTick
             }
         })
-
         getNewPos()
     }
     catch (err) {
@@ -269,7 +273,7 @@ function getAllData() {
     }
 }
 
-//calculates the robots current position
+//calculates the robots current pose
 function getNewPos() {
     //right wheel distance in mm
     let dr 
@@ -309,12 +313,24 @@ function getNewPos() {
     //Calculate robot heading
     let headingEncoders = Number((robotData.heading + ((dr - dl) / robotData.wheelBase)).toFixed(3))
     let headingImu = Number((robotData.heading + robotData.imu[2] * 0.0174533 * dt).toFixed(4))
-    // robotData.heading = Number(Math.atan2(Math.sin(headingImu), Math.cos(headingImu)).toFixed(3))
     robotData.heading = headingImu
     robotData.posX = Number((robotData.posX + dc * Math.cos(robotData.heading)).toFixed(3))
     robotData.posY = Number((robotData.posY + dc * Math.sin(robotData.heading)).toFixed(3))
     // console.log(headingImu, headingEncoders, robotData.heading)
     // console.log(robotData.imu)
+    if(!avoid && robotData.ultrasonicArray[1] < obstacleThresh) {
+        followBoundary()
+    }
+    if(avoid && robotData.ultrasonicArray[2] > obstacleThresh && robotData.ultrasonicArray[1] > obstacleThresh) {
+        if( robotData.objEdge.length < 1 ) {
+            robotData.objEdge.push(robotData.posX)
+            robotData.objEdge.push(robotData.posY)
+        }
+        stopFollowBoundary()
+    }
+    if(!avoid && robotData.ultrasonicArray[2] > obstacleThresh && robotData.ultrasonicArray[1] > obstacleThresh && obstacles > 0 ) {
+        headingAngle = Math.atan2((yGoal - robotData.posY), (xGoal - robotData.posX))
+    }
     getDistToGoal()
 }
 
@@ -324,10 +340,10 @@ function getDistToGoal() {
     let u2
     u1 = xGoal - robotData.posX
     u2 = yGoal - robotData.posY
-    if (Math.abs(u1) <= 0.04) {
+    if (Math.abs(u1) <= 0.02) {
         u1 = 0
     }
-    if (Math.abs(u2) <= 0.04) {
+    if (Math.abs(u2) <= 0.02) {
         u2 = 0
     }
 
@@ -338,7 +354,6 @@ function getDistToGoal() {
 
 //the PID controller for heading adjustment
 function PID(u) {
-    // console.log("Computing controller outputs")
     let oldErr = robotData.headingErr
     // robotData.headingErr = Number((headingAngle - robotData.heading).toFixed(3))
     robotData.headingErr = Number(Math.atan2(Math.sin(headingAngle - robotData.heading), Math.cos(headingAngle - robotData.heading)).toFixed(3))
@@ -498,8 +513,6 @@ function getNewHeadingGoal(v1, v2) {
     console.log(`New heading: ${newHeading}`)
     console.log(`Total: ${totalHeading}`)
     console.log(`Total atan2: ${Math.atan2(Math.sin(totalHeading), Math.cos(totalHeading))}`)
-
-
     if (totalHeading == Number(Math.PI.toFixed(4)) && v1[1] == 0) {
         return totalHeading
     }
@@ -546,6 +559,25 @@ function cleanup() {
     console.log("cleanup")
     setTimeout(stopMotors, 50)
     setTimeout(resetArduino, 100)
+}
+
+function followBoundary() {
+    obstacles ++
+    avoid = 1
+    headingAngle = headingAngle + Math.PI / 2
+    if(robotData.fwStart.length < 1) {
+        robotData.fwStart.push(robotData.posX)
+        robotData.fwStart.push(robotData.posY)
+    }
+    // robotData.headingErr = Number(Math.atan2(Math.sin(avoid - robotData.heading), Math.cos(avoid - robotData.heading)).toFixed(3))
+}
+
+function stopFollowBoundary() {
+    if(robotData.posY > robotData.objEdge[1] + 0.2 || robotData.posX > robotData.objEdge[0] + 0.2) {
+        headingAngle = headingAngle - Math.PI / 2
+        avoid = 0
+        robotData.objEdge = []
+    }
 }
 
 board.on('ready', function () {
