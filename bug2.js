@@ -39,6 +39,7 @@ const robotData = {
     headingErr: 0,
     sumErr: 0,
     ultrasonicArray: [],
+    distSense: [],
     imu: [],
     wheelBase: 0.2286,
     wheelRadius: 0.030,
@@ -47,7 +48,8 @@ const robotData = {
     modes: ["go_to_goal", "follow_wall"],
     mode: undefined,
     followWallPath: [],
-    obstacleHitPoint: []
+    obstacleHitPoint: [],
+    obstacleEdge: []
 }
 
 const imu = new mpu({ device: '/dev/i2c-4', UpMagneto: false, scaleValues: true, gyroBiasOffset: GYRO_OFFSET })
@@ -86,7 +88,7 @@ function getGoal() {
 ///////////////////////////////////////////////////////////////////////////////////////////
 //gets encoder, imu and ultrasonic sensor data
 function getArduinoData() {
-    console.log(headingAngle, robotData.heading, robotData.posX, robotData.posY, robotData.mode)
+    console.log(headingAngle, robotData.heading, robotData.posX, robotData.posY, robotData.pwmL, robotData.pwmR, robotData.mode, robotData.distSense, robotData.leftTickTotal, robotData.rightTickTotal)
     robotData.imu = imu.getGyro()
     try {
         board.io.i2cConfig({
@@ -95,7 +97,8 @@ function getArduinoData() {
         board.io.i2cReadOnce(arduino, 11, (bytes) => {
             //bytes[2], [3], [4], [5] == left encoder
             //bytes[6], [7], [8], [9] == right encoder
-            robotData.ultrasonicArray = [bytes[0], bytes[1], bytes[10]]
+            // robotData.ultrasonicArray = [bytes[0], bytes[1], bytes[10]]
+            sonarFilter(bytes[0], bytes[1], bytes[10])
             let leftEncoder = Buffer.from([bytes[2], bytes[3], bytes[4], bytes[5]])
             let leftTick = Number(leftEncoder.readInt32BE(0).toString())
             let rightEncoder = Buffer.from([bytes[6], bytes[7], bytes[8], bytes[9]])
@@ -134,7 +137,7 @@ function getArduinoData() {
                 robotData.rightTickTotal = rightTick
             }
         })
-        if(robotData.ultrasonicArray[1] < obstacleThresh) {
+        if(robotData.distSense[1] < obstacleThresh) {
             setMode(robotData.modes[1])
         }
         if(robotData.mode == robotData.modes[0]) {
@@ -203,11 +206,8 @@ function getNewPos() {
     dl = Number(dl.toFixed(4))
     //center of wheelbase distance in mm
     let dc = (dl + dr) / 2
-    //Calculate robot heading
+    //calculate robot heading
     let headingImu = Number((robotData.heading + robotData.imu[2] * 0.0174533 * dt).toFixed(4))
-    // robotData.heading = headingImu
-    // robotData.posX = Number((robotData.posX + dc * Math.cos(robotData.heading)).toFixed(3))
-    // robotData.posY = Number((robotData.posY + dc * Math.sin(robotData.heading)).toFixed(3))
     let x = Number((robotData.posX + dc * Math.cos(robotData.heading)).toFixed(3))
     let y = Number((robotData.posY + dc * Math.sin(robotData.heading)).toFixed(3))
     let newPose = [x, y, headingImu]
@@ -241,7 +241,7 @@ function motorVels(w, u) {
 function motorCommand(vr, vl) {
     //forward direction == 1
     const vMax = 255
-    const vMin = 180
+    const vMin = 190
     let spdL
     let spdR
     let dirL = 1
@@ -336,10 +336,9 @@ function goToGoal() {
     let thetaErr = Math.atan2(Math.sin(headingAngle - robotData.heading), Math.cos(headingAngle - robotData.heading))
     let omega = PID(thetaErr)
     let motorVelocities = motorVels(omega, [xErr, yErr])
-    if(thetaErr < 0.06) {
-        if(Math.abs(xErr) < maxErr && Math.abs(yErr) < maxErr) {
-            return reachedGoal()
-        }
+    let atGoalPos = checkGoalReached()
+    if(atGoalPos) {
+        return reachedGoal()
     }
     return motorCommand(motorVelocities[0], motorVelocities[1])
 }
@@ -348,11 +347,30 @@ function goToGoal() {
 //drives the robot along an obstacle
 function followWall() {
     let poseUpdate = getNewPos()
+    robotData.posX = poseUpdate[0]
+    robotData.posY = poseUpdate[1]
+    robotData.heading = poseUpdate[2]
     if(robotData.obstacleHitPoint.length < 1) {
         robotData.obstacleHitPoint.push(poseUpdate[0], poseUpdate[1], poseUpdate[2])
     }
     robotData.followWallPath.push([poseUpdate[0], poseUpdate[1], poseUpdate[2]])
-    
+    if(robotData.distSense[2] > obstacleThresh) {
+        headingAngle = headingAngle + 0.017453*2
+    }
+    if(robotData.distSense[1] > obstacleThresh && robotData.distSense[2] > obstacleThresh && headingAngle != robotData.obstacleHitPoint[2]) {
+        if(robotData.obstacleEdge.length < 1) {
+            return robotData.obstacleEdge.push(poseUpdate[0], poseUpdate[1], poseUpdate[2])
+        }
+        else if(robotData.obstacleEdge.length > 1 && robotData.posY > robotData.obstacleEdge[1] + 0.2) {
+            headingAngle = headingAngle - 0.17453*2
+        }
+    }
+    let xErr = xGoal - robotData.posX
+    let yErr = yGoal - robotData.posY
+    let thetaErr = Math.atan2(Math.sin(headingAngle - robotData.heading), Math.cos(headingAngle - robotData.heading))
+    let omega = PID(thetaErr)
+    let motorVelocities = motorVels(omega, [xErr, yErr])
+    return motorCommand(motorVelocities[0], motorVelocities[1])
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -364,7 +382,8 @@ function resetArduino() {
     board.io.i2cWrite(arduino, [3])
     console.log("reset arduino")
 }
-
+/////////////////////////////////////////////////////////////////////////////////////////
+//ends the robot navigation
 function reachedGoal() {
     clearInterval(reFresh)
     console.log(`Final x position: ${robotData.posX}`)
@@ -372,6 +391,41 @@ function reachedGoal() {
     console.log(`Final heading angle: ${robotData.heading}`)
     setTimeout(stopMotors, 20)
     setTimeout(resetArduino, 50)
+}
+
+function sonarFilter(a, b, c) {
+    if(robotData.ultrasonicArray.length < 5) {
+        return robotData.ultrasonicArray.push([a,b,c])
+    }
+    robotData.ultrasonicArray.unshift([a,b,c])
+    robotData.ultrasonicArray.pop()
+    let sumA = 0
+    let sumB = 0
+    let sumC = 0
+
+    for(let i = 0; i < robotData.ultrasonicArray.length; i++) {
+        sumA += robotData.ultrasonicArray[i][0]
+        sumB += robotData.ultrasonicArray[i][1]
+        sumC += robotData.ultrasonicArray[i][2]
+    }
+
+    let avgA = sumA / robotData.ultrasonicArray.length
+    let avgB = sumB / robotData.ultrasonicArray.length
+    let avgC = sumC / robotData.ultrasonicArray.length
+
+    robotData.distSense[0] = Math.round(avgA)
+    robotData.distSense[1] = Math.round(avgB)
+    robotData.distSense[2] = Math.round(avgC)
+
+}
+
+function checkGoalReached() {
+    if(Math.abs(robotData.posX) >= Math.abs(xGoal) && Math.abs(robotData.posY) >= Math.abs(yGoal)){
+        return true
+    }
+    else {
+        return false
+    }
 }
 
 board.on("ready", function () {
